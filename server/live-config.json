@@ -1,0 +1,49 @@
+{
+  "network": "testnet",
+  "chainId": 296,
+  "hashio": "https://testnet.hashio.io/api",
+  "mirror": "https://testnet.mirrornode.hedera.com/api/v1",
+  "hashscan": "https://hashscan.io/testnet",
+  "topicId": "0.0.10155252",
+  "updatedAt": "2026-11-13T18:31:48.689Z",
+  "tokenId": "0.0.11440547",
+  "token": {
+    "name": "KWRT",
+    "symbol": "KWRT",
+    "decimals": 3,
+    "totalSupply": 783
+  },
+  "seller": {
+    "accountId": "0.0.10149503",
+    "evmAddress": "0xEA2AB23a5f8050B68A9cA29D0Fce70c0001938a7",
+    "label": "Atlas Wind Energy",
+    "role": "seller"
+  },
+  "client": {
+    "accountId": "0.0.11440477",
+    "evmAddress": "0x3f521B814Ba0114230336B422D41836fbBAae473",
+    "label": "KWRT Demo Client",
+    "role": "client"
+  },
+  "ask": {
+    "askKey": "CERT-013",
+    "certId": "CERT-013",
+    "producer": "Atlas Wind Energy",
+    "country": "Morocco",
+    "sourceType": "WIND",
+    "kwh": 783,
+    "amountTokenUnits": 783000,
+    "priceHbarPerKwh": 0.037,
+    "priceHbar": 28.971,
+    "purchased": true,
+    "paymentSent": true,
+    "purchaseTransactionId": "0x2796b1e6bedac62bba8c00b2094c7f165aa61d53c0ab4c0f4f46178c67ea9286",
+    "purchasePaymentTransactionId": "0xfbe4c52033ee49d40702744583e3f1924a5a63da0dab871dc1350d3db1b6cca4",
+    "purchasedBy": "0.0.11440477",
+    "purchasedAt": "2026-11-13T18:31:48.689Z"
+  },
+  "transactions": {
+    "tokenCreate": "0x8de3e52ba696e7fc31b18513aee6a7fc5cf36875265078a2b1b11f666f407313",
+    "mint": "0xec3cc43abcd9103620cc3466f30a5d792c2f9cec02c83c16ae03555090a59679"
+  }
+}

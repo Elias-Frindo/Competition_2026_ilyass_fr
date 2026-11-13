@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KWRT prototype — Hourly RECs, provable on Hedera</title>
+<meta name="description" content="KWRT prototype: per-hour Renewable Energy Certificates with HCS-timestamped meter readings on Hedera. Testnet simulation." />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="127.5 55 345 345" aria-label="KWRT logo" role="img">
+      <rect x="127.5" y="55" width="345" height="345" fill="#0B6E4F"/>
+      <polygon points="300,70 435,148 435,308 300,386 165,308 165,148" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round"/>
+      <polygon points="300,92 416,159 416,297 300,364 184,297 184,159" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="2"/>
+      <polygon points="322,118 245,243 293,243 270,330 362,200 312,200" fill="#FFFFFF"/>
+      <path d="M270 330 C 292 292, 340 282, 380 292 C 376 332, 332 358, 270 330 Z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M280 326 C 305 314, 338 304, 366 298" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+    <div class="brand-text">
+      <span class="brand-name">KWRT</span>
+      <span class="brand-ver">prototype</span>
+    </div>
+  </div>
+
+  <nav class="nav" id="nav" aria-label="Sections">
+    <button class="nav-btn is-active" data-view="dashboard">Dashboard</button>
+    <button class="nav-btn" data-view="pipeline">Pipeline runner</button>
+    <button class="nav-btn" data-view="engine">Validation engine</button>
+    <button class="nav-btn" data-view="verifier">Verifier</button>
+    <button class="nav-btn" data-view="marketplace">Marketplace</button>
+    <button class="nav-btn" data-view="live">Live testnet <span class="nav-live-dot" aria-hidden="true"></span></button>
+    <button class="nav-btn" data-view="trust">Trust &amp; costs</button>
+  </nav>
+
+  <div class="topbar-right">
+    <span class="badge badge-sim" title="Every view is simulated except Live testnet, which executes real Hedera testnet transactions.">
+      <span class="dot"></span>Testnet prototype
+    </span>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ───────────────── DASHBOARD ───────────────── -->
+  <section class="view is-active" id="view-dashboard">
+    <div class="view-head">
+      <div>
+        <h1>Operations dashboard</h1>
+        <p class="sub">Hourly certification of renewable production across 6 installations in Morocco and Tunisia. Every reading hash and every verdict is written to HCS topic <code>0.0.10155252</code>.</p>
+      </div>
+      <div class="chipset" id="chain-chips"></div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Hourly production &amp; verdicts</h2>
+            <p class="sub">SolarTech Morocco · MTR-TNG-01 · 500 kW · Tangier (35.76°N, −5.83°W) · 22 Aug 2026, local time (UTC+1)</p>
+          </div>
+          <div class="legend">
+            <span class="lg lg-pass">PASS</span>
+            <span class="lg lg-quar">QUARANTINE</span>
+            <span class="lg lg-fail">FAIL</span>
+          </div>
+        </div>
+        <div class="chart-wrap" id="chart-wrap"></div>
+        <p class="note" id="chart-note">Hover or focus a point to inspect the reading.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Recent events</h2>
+            <p class="sub">Live feed of pipeline activity (simulated stream)</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="feed-toggle" aria-pressed="true">Pause</button>
+        </div>
+        <ul class="feed" id="feed"></ul>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Installations</h2><p class="sub">Per-installation validation config drives the rule thresholds</p></div></div>
+        <div class="table-scroll"><table class="tbl" id="tbl-installations"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h2>Quarantine queue</h2><p class="sub">Statistical outliers held for operator review. Approve/reject is itself written to HCS.</p></div></div>
+        <div class="table-scroll"><table class="tbl" id="tbl-quarantine"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────── PIPELINE ───────────────── -->
+  <section class="view" id="view-pipeline">
+    <div class="view-head">
+      <div>
+        <h1>Pipeline runner</h1>
+        <p class="sub">The 10-step path from a signed meter reading to a retired certificate. Signature → dedup → HCS #1 → validation → HCS #2 → mint → listing → agent match &amp; atomic settlement → burn → receipt.</p>
+      </div>
+      <div class="run-controls">
+        <button class="btn btn-primary" id="run-pass">Run full demo</button>
+        <button class="btn btn-amber" id="run-quar">Run quarantine scenario</button>
+        <button class="btn btn-ghost" id="run-reset">Reset</button>
+      </div>
+    </div>
+
+    <div class="panel panel-run">
+      <div class="run-summary" id="run-summary">
+        <div class="run-meta">
+          <div><span class="k">Scenario</span><span class="v" id="rs-scenario">idle</span></div>
+          <div><span class="k">Reading</span><span class="v mono" id="rs-reading">—</span></div>
+          <div><span class="k">Verdict</span><span class="v" id="rs-verdict">—</span></div>
+          <div><span class="k">Elapsed</span><span class="v mono" id="rs-elapsed">0 ms</span></div>
+          <div><span class="k">On-chain cost</span><span class="v mono" id="rs-cost">$0.0000</span></div>
+        </div>
+        <div class="progress"><div class="progress-bar" id="rs-progress"></div></div>
+        <p class="note" id="rs-step-note">Press <strong>Run full demo</strong> to stream the pipeline. Nothing is submitted to a real network — identifiers are generated locally.</p>
+      </div>
+      <ol class="steps" id="steps"></ol>
+    </div>
+  </section>
+
+  <!-- ───────────────── ENGINE ───────────────── -->
+  <section class="view" id="view-engine">
+    <div class="view-head">
+      <div>
+        <h1>Validation engine inspector</h1>
+        <p class="sub">Six deterministic physical rules plus rolling z-score and IQR over the trailing 30 same-hour intervals. Deterministic and open-source — <strong>not machine learning, and not called AI</strong>.</p>
+      </div>
+    </div>
+
+    <div class="grid-engine">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Inputs</h2><p class="sub">Move a control and watch the verdict recompute</p></div>
+          <button class="btn btn-ghost btn-sm" id="eng-reset">Reset inputs</button>
+        </div>
+
+        <label class="field">
+          <span class="field-label">Installation</span>
+          <select id="eng-inst" class="select"></select>
+        </label>
+
+        <div class="slider" data-for="energy">
+          <div class="slider-top"><label for="eng-energy">Energy this interval</label><output class="mono" id="out-energy">—</output></div>
+          <input type="range" id="eng-energy" min="0" max="2400" step="0.5" value="412.5" />
+          <div class="slider-scale"><span>0 kWh</span><span id="scale-energy-mid"></span><span id="scale-energy-max"></span></div>
+        </div>
+
+        <div class="slider" data-for="hour">
+          <div class="slider-top"><label for="eng-hour">Interval start (local hour)</label><output class="mono" id="out-hour">—</output></div>
+          <input type="range" id="eng-hour" min="0" max="23" step="1" value="12" />
+          <div class="slider-scale"><span>00:00</span><span>12:00</span><span>23:00</span></div>
+        </div>
+
+        <div class="slider" data-for="cap">
+          <div class="slider-top"><label for="eng-cap">Installation capacity</label><output class="mono" id="out-cap">—</output></div>
+          <input type="range" id="eng-cap" min="50" max="2500" step="10" value="500" />
+          <div class="slider-scale"><span>50 kW</span><span>1,275 kW</span><span>2,500 kW</span></div>
+        </div>
+
+        <div class="slider" data-for="ceiling">
+          <div class="slider-top"><label for="eng-ceiling">Performance ceiling</label><output class="mono" id="out-ceiling">—</output></div>
+          <input type="range" id="eng-ceiling" min="1" max="1.5" step="0.01" value="1.15" />
+          <div class="slider-scale"><span>1.00×</span><span>1.25×</span><span>1.50×</span></div>
+        </div>
+
+        <div class="toggles">
+          <label class="check"><input type="checkbox" id="eng-flat" /> <span>Previous 5 intervals byte-identical (stuck sensor)</span></label>
+          <label class="check"><input type="checkbox" id="eng-dup" /> <span>Natural key <span class="mono">(meterId, intervalStart, intervalEnd)</span> already present</span></label>
+        </div>
+
+        <div class="ctx" id="eng-ctx"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div><h2>Verdict</h2><p class="sub">PASS mints · FAIL rejects (verdict still written to HCS) · SUSPECT quarantines</p></div>
+          <div id="eng-verdict-pill" class="pill">—</div>
+        </div>
+        <div class="table-scroll"><table class="tbl tbl-rules" id="tbl-rules"></table></div>
+
+        <h3 class="h3">Statistics — trailing 30 same-hour intervals</h3>
+        <div class="table-scroll"><table class="tbl" id="tbl-stats"></table></div>
+        <p class="note">Statistical flags never hard-reject: curtailment, inverter restarts and snow-clearing spikes are legitimate anomalies, so <span class="mono">SUSPECT</span> routes to an operator queue instead of destroying a valid certificate.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────── VERIFIER ───────────────── -->
+  <section class="view" id="view-verifier">
+    <div class="view-head">
+      <div>
+        <h1>Certificate verifier</h1>
+        <p class="sub">Verify a certificate without trusting KWRT. The SHA-256 below is recomputed in your browser with <code>window.crypto.subtle</code> over the canonical payload — no server, no faking.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="verifier-input">
+        <label class="field grow">
+          <span class="field-label">measurementId</span>
+          <input class="input mono" id="ver-id" placeholder="paste a measurementId, e.g. a3f1…" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span class="field-label">or pick a reading</span>
+          <select class="select" id="ver-pick"></select>
+        </label>
+        <button class="btn btn-primary" id="ver-run">Verify</button>
+      </div>
+      <p class="note" id="ver-hint">Six independent checks run in sequence. Step 4 is the real one: canonical JSON in, hex digest out.</p>
+    </div>
+
+    <ol class="vsteps" id="vsteps"></ol>
+  </section>
+
+  <!-- ───────────────── MARKETPLACE ───────────────── -->
+  <section class="view" id="view-marketplace">
+    <div class="view-head">
+      <div>
+        <h1>Marketplace</h1>
+        <p class="sub">Hourly certificates on an order book. A rule-based buyer agent (not AI) matches against an explicit policy, then HBAR payment and the HTS transfer settle in a single atomic transaction.</p>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Bids</h2><p class="sub">Buy-side depth · HBAR / kWh</p></div></div>
+        <div class="table-scroll"><table class="tbl" id="tbl-bids"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h2>Asks</h2><p class="sub">Listed certificates · HBAR / kWh</p></div></div>
+        <div class="table-scroll"><table class="tbl" id="tbl-asks"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h2>Buyer agent policy</h2><p class="sub">Deterministic matcher, editable</p></div></div>
+        <label class="field"><span class="field-label">Agent</span><select class="select" id="mkt-agent"></select></label>
+        <div class="policy" id="policy"></div>
+        <button class="btn btn-primary full" id="mkt-match">Run agent match</button>
+        <div class="settle" id="settle"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Trades</h2><p class="sub">Atomic settlement history</p></div></div>
+        <div class="table-scroll"><table class="tbl" id="tbl-trades"></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h2>Retirement</h2><p class="sub">HTS burn removes supply, then a retirement receipt is written to HCS</p></div></div>
+        <label class="field"><span class="field-label">Certificate to retire</span><select class="select" id="ret-pick"></select></label>
+        <button class="btn btn-primary full" id="ret-run">Burn &amp; retire</button>
+        <div class="receipt" id="receipt"></div>
+        <div class="table-scroll"><table class="tbl" id="tbl-retirements"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────── LIVE TESTNET ───────────────── -->
+  <section class="view" id="view-live">
+    <div class="view-head">
+      <div>
+        <h1>Live testnet</h1>
+        <p class="sub">A real certificate purchase on Hedera testnet, with two fixed accounts. <b>Atlas Wind Energy</b> sells 783 kWh of wind production to the <b>KWRT Demo Client</b> — an account that starts with HBAR and <b>zero KWRT</b>. No wallet extension needed: the local relay signs both sides.</p>
+      </div>
+      <div class="live-head-actions">
+        <span class="pill pill-live" id="live-relay-pill"><span class="live-pill-dot"></span>relay: checking</span>
+        <button class="btn btn-ghost btn-sm" id="live-refresh">Refresh</button>
+      </div>
+    </div>
+
+    <div class="grid-2 live-accounts">
+      <div class="panel account-card" id="live-seller-card">
+        <div class="panel-head">
+          <div>
+            <h2>Seller</h2>
+            <p class="sub">Producer · holds the real KWRT supply</p>
+          </div>
+          <span class="role-tag role-seller">treasury</span>
+        </div>
+        <div class="account-body" id="live-seller"></div>
+      </div>
+      <div class="panel account-card" id="live-client-card">
+        <div class="panel-head">
+          <div>
+            <h2>Client</h2>
+            <p class="sub">Buyer · starts with HBAR, no KWRT</p>
+          </div>
+          <span class="role-tag role-client">buyer</span>
+        </div>
+        <div class="account-body" id="live-client"></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Certificate on offer</h2>
+            <p class="sub">Real HTS token supply, minted ahead of the demo</p>
+          </div>
+          <span class="pill pill-live"><span class="live-pill-dot"></span>live</span>
+        </div>
+        <div class="live-ask" id="live-ask"></div>
+        <button class="btn btn-primary full live-buy-btn" id="live-buy" disabled>Buy certificate</button>
+        <p class="note" id="live-buy-note">Loading the live demo configuration…</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Settlement</h2>
+            <p class="sub">Real transaction hashes, confirmed on Hedera testnet</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="live-reset" disabled>Reset demo</button>
+        </div>
+        <div class="live-steps" id="live-steps">
+          <p class="note" style="margin-top:0">No purchase yet. The client will pay HBAR and receive KWRT.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>On-chain references</h2>
+          <p class="sub">Everything below can be checked without trusting KWRT</p>
+        </div>
+      </div>
+      <div class="live-links" id="live-links"></div>
+      <p class="note">This section talks to <code>http://127.0.0.1:8787</code>, which serves this page and submits real testnet transactions through Hedera's EVM relay. Private keys stay in the local <code>.env</code>; the browser only receives public account, token and transaction data.</p>
+    </div>
+  </section>
+
+  <!-- ───────────────── TRUST ───────────────── -->
+  <section class="view" id="view-trust">
+    <div class="view-head">
+      <div>
+        <h1>Trust model &amp; costs</h1>
+        <p class="sub">The honest boundary is narrower than “trustless”. This prototype is a <strong>trusted issuer</strong> for validation and mint authority, and trustless for reading integrity, ownership and retirement.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div><h2>Trust boundary</h2><p class="sub">What you must trust, and what you can check yourself</p></div></div>
+      <div class="table-scroll"><table class="tbl tbl-trust" id="tbl-trust"></table></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><div><h2>On-chain cost per certified reading</h2><p class="sub">Published Hedera fee schedules, August 2026</p></div></div>
+        <div class="table-scroll"><table class="tbl" id="tbl-costs"></table></div>
+        <div class="cost-callout" id="cost-callout"></div>
+        <p class="note">HCS message pricing rose from $0.0001 to $0.0008 in January 2026 (<a href="https://hedera.com/blog/price-update-to-consensussubmitmessage-in-consensus-service-january-2026/" target="_blank" rel="noopener">Hedera price update</a>), which is why the verdict is batched into one message instead of one message per rule. Fees: <a href="https://docs.hedera.com/networks/fees" target="_blank" rel="noopener">Hedera fee schedule</a>; mint cost: <a href="https://hedera.com/blog/hedera-token-service-hts-live-on-mainnet-with-over-60-initial-ecosystem-partners/" target="_blank" rel="noopener">HTS on mainnet</a>.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div><h2>Anti-double-counting</h2><p class="sub">Four independent layers, ordered by strength</p></div></div>
+        <ol class="layers" id="layers"></ol>
+        <h3 class="h3">Limitations we do not paper over</h3>
+        <ul class="limits" id="limits"></ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div><h2>Units &amp; rounding</h2><p class="sub">Energy accounting with undefined rounding is not auditable</p></div></div>
+      <div class="units" id="units"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>KWRT prototype — Hedera Cross Campus Challenge 2026 (Morocco / Tunisia).</span>
+  <span>Prototype front-end. The Live testnet section executes real Hedera testnet transactions; every other view is simulated. Not an accredited registry; KWRT is not legally equivalent to I-REC or a Guarantee of Origin. A token represents an environmental attribute, not physical electrons.</span>
+</footer>
+
+<div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+
+<script src="js/util.js"></script>
+<script src="js/solar.js"></script>
+<script src="js/data.js"></script>
+<script src="js/validation.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/pipeline.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/verifier.js"></script>
+<script src="js/marketplace.js"></script>
+<script src="js/trust.js"></script>
+<script src="js/live.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

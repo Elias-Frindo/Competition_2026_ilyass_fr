@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="127.5 55 345 345" role="img" aria-label="KWRT logo">
+  <rect x="127.5" y="55" width="345" height="345" fill="#0B6E4F"/>
+  <polygon points="300,70 435,148 435,308 300,386 165,308 165,148" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round"/>
+  <polygon points="300,92 416,159 416,297 300,364 184,297 184,159" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="2"/>
+  <polygon points="322,118 245,243 293,243 270,330 362,200 312,200" fill="#FFFFFF"/>
+  <path d="M270 330 C 292 292, 340 282, 380 292 C 376 332, 332 358, 270 330 Z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M280 326 C 305 314, 338 304, 366 298" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+</svg>

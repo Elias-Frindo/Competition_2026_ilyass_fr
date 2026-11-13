@@ -1,0 +1,12 @@
+# Secrets — never commit these
+.env
+*.env
+!.env.example
+!scripts/.env.example
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS noise
+.DS_Store
